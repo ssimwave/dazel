@@ -157,3 +157,7 @@ The possible parameters to set are (with their defaults):
     # More information on the :delegated flag: https://docs.docker.com/docker-for-mac/osxfs-caching/.
     # NOTE: This will fail on Docker versions < 17.04.
     DAZEL_DELEGATED_VOLUME=True
+
+    # The user, in the same format as the --user option docker run and docker exec takes,
+    # to use when starting the container and executing commands inside of the container
+    DAZEL_USER = ""

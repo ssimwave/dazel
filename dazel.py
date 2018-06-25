@@ -27,6 +27,7 @@ DEFAULT_DOCKER_COMPOSE_FILE = ""
 DEFAULT_DOCKER_COMPOSE_COMMAND = "docker-compose"
 DEFAULT_DOCKER_COMPOSE_PROJECT_NAME = "dazel"
 DEFAULT_DOCKER_COMPOSE_SERVICES = ""
+DEFAULT_USER = ""
 
 DEFAULT_DELEGATED_VOLUME = True
 DEFAULT_BAZEL_USER_OUTPUT_ROOT = os.path.expanduser("~/.cache/bazel/_bazel_%s" %
@@ -56,7 +57,7 @@ class DockerInstance:
                        run_deps, docker_compose_file, docker_compose_command,
                        docker_compose_project_name, docker_compose_services, bazel_user_output_root,
                        bazel_rc_file, docker_run_privileged, docker_machine, dazel_run_file,
-                       workspace_hex, delegated_volume):
+                       workspace_hex, delegated_volume, user):
         real_directory = os.path.realpath(directory)
         self.workspace_hex_digest = ""
         self.instance_name = instance_name
@@ -78,6 +79,7 @@ class DockerInstance:
         self.docker_machine = docker_machine
         self.dazel_run_file = dazel_run_file
         self.delegated_volume_flag = ":delegated" if delegated_volume else ""
+        self.user = user
 
         if workspace_hex:
             self.workspace_hex_digest = hashlib.md5(real_directory.encode("ascii")).hexdigest()
@@ -131,23 +133,26 @@ class DockerInstance:
                 workspace_hex=config.get("DAZEL_WORKSPACE_HEX",
                                           DEFAULT_WORKSPACE_HEX),
                 delegated_volume=config.get("DAZEL_DELEGATED_VOLUME", "DEFAULT_DELEGATED_VOLUME"),
+                user = config.get("DAZEL_USER", DEFAULT_USER),
         )
 
     def send_command(self, args):
         term_size = shutil.get_terminal_size()
-        command = "%s exec -i -e COLUMNS=%s -e LINES=%s -e TERM=%s %s %s %s %s %s %s %s" % (
+        command = "%s exec -i -e COLUMNS=%s -e LINES=%s -e TERM=%s %s %s %s %s %s %s %s %s" % (
             self.docker_command,
             term_size.columns, term_size.lines,
             os.environ.get("TERM", ""),
             "-t" if sys.stdout.isatty() else "",
             "--privileged" if self.docker_run_privileged else "",
+            ("--user=%s" % self.user
+             if self.user else ""),
             self.instance_name,
             self.command,
             ("--bazelrc=%s" % self.bazel_rc_file
              if self.bazel_rc_file and self.command else ""),
             ("--output_user_root=%s --output_base=%s" % (
                 TEMP_BAZEL_OUTPUT_USER_ROOT, self.bazel_output_base)
-             if self.command and self.bazel_output_base
+             if self.command and self.bazel_output_base and not self.user
              else  "--output_user_root=%s" % self.bazel_user_output_root
                    if self.command and self.bazel_user_output_root
                    else ""),
@@ -322,10 +327,12 @@ class DockerInstance:
         logger.info("Starting docker container '%s'..." % self.instance_name)
         command = "%s stop %s >/dev/null 2>&1 ; " % (self.docker_command, self.instance_name)
         command += "%s rm %s >/dev/null 2>&1 ; " % (self.docker_command, self.instance_name)
-        command += "%s run -id --name=%s %s %s %s %s %s %s%s %s" % (
+        command += "%s run -id --name=%s %s %s %s %s %s %s %s%s %s" % (
             self.docker_command,
             self.instance_name,
             "--privileged" if self.docker_run_privileged else "",
+            ("--user=%s" % self.user
+             if self.user else ""),
             ("-w %s" % os.path.realpath(self.directory)) if self.directory else "",
             self.volumes,
             self.ports,
@@ -536,4 +543,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-
