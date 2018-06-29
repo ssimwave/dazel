@@ -140,4 +140,9 @@ DAZEL_DELEGATED_VOLUME=True
 # The user, in the same format as the --user option docker run and docker exec takes,
 # to use when starting the container and executing commands inside of the container
 DAZEL_USER = ""
+
+# The groups to add when starting the docker container.
+# This can be a python iterable, or a comma-separated string.
+DAZEL_GROUPS = []
+
 ```
