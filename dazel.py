@@ -2,6 +2,7 @@ import hashlib
 import logging
 import os
 import shutil
+import shlex
 import subprocess
 import sys
 import collections
@@ -58,7 +59,8 @@ class DockerInstance:
                        run_deps, docker_compose_file, docker_compose_command,
                        docker_compose_project_name, docker_compose_services, bazel_user_output_root,
                        bazel_rc_file, docker_run_privileged, docker_machine, dazel_run_file,
-                       workspace_hex, delegated_volume, user, groups):
+                       workspace_hex, delegated_volume, user, groups,
+                       ssh_auth_sock,):
         real_directory = os.path.realpath(directory)
         self.workspace_hex_digest = ""
         self.instance_name = instance_name
@@ -81,6 +83,7 @@ class DockerInstance:
         self.dazel_run_file = dazel_run_file
         self.delegated_volume_flag = ":delegated" if delegated_volume else ""
         self.user = user
+        self.ssh_auth_sock = ssh_auth_sock
 
         if workspace_hex:
             self.workspace_hex_digest = hashlib.md5(real_directory.encode("ascii")).hexdigest()
@@ -135,16 +138,21 @@ class DockerInstance:
                 workspace_hex=config.get("DAZEL_WORKSPACE_HEX",
                                           DEFAULT_WORKSPACE_HEX),
                 delegated_volume=config.get("DAZEL_DELEGATED_VOLUME", "DEFAULT_DELEGATED_VOLUME"),
-                user = config.get("DAZEL_USER", DEFAULT_USER),
-                groups = config.get("DAZEL_GROUPS", DEFAULT_GROUPS),
+                user=config.get("DAZEL_USER", DEFAULT_USER),
+                groups=config.get("DAZEL_GROUPS", DEFAULT_GROUPS),
+                ssh_auth_sock=os.environ.get('SSH_AUTH_SOCK', None),
         )
 
     def send_command(self, args):
         term_size = shutil.get_terminal_size()
-        command = "%s exec -i -e COLUMNS=%s -e LINES=%s -e TERM=%s %s %s %s %s %s %s %s %s" % (
+        sock = ''
+        if self.ssh_auth_sock is not None:
+            sock = '-e SSH_AUTH_SOCK=%s' % shlex.quote(self.ssh_auth_sock)
+        command = "%s exec -i -e COLUMNS=%s -e LINES=%s -e TERM=%s %s %s %s %s %s %s %s %s %s" % (
             self.docker_command,
             term_size.columns, term_size.lines,
             os.environ.get("TERM", ""),
+            sock,
             "-t" if sys.stdout.isatty() else "",
             "--privileged" if self.docker_run_privileged else "",
             ("--user=%s" % self.user
@@ -413,6 +421,9 @@ class DockerInstance:
         # Make sure the path exists on the host.
         if self.bazel_user_output_root and not os.path.isdir(self.bazel_user_output_root):
             os.makedirs(self.bazel_user_output_root)
+
+        if self.ssh_auth_sock is not None:
+            volumes.append("%(sock)s:%(sock)s" % {'sock': self.ssh_auth_sock})
 
         # Calculate the volumes string.
         self.volumes = '-v "%s"' % '" -v "'.join(volumes)
