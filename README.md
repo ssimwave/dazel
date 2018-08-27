@@ -146,3 +146,15 @@ DAZEL_USER = ""
 DAZEL_GROUPS = []
 
 ```
+
+## Releasing
+1. Update the version number in setup.py.  This is the only place it is
+   recorded.
+2. Run `python3 setup.py sdist setup.py`.  This will generate the source
+   distribution (tarball) in `dist`.
+3. Run `python setup.py bdist_wheel`.  This will generate the Wheel binary
+   distribution in `dist`.  (Which is still cross-platform.)
+4. Create a Git branch for the release.
+5. Add the files to Git and commit them.
+6. Push the branch to Github.
+7. Create a pull request.
