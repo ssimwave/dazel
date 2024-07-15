@@ -10,7 +10,15 @@ import collections.abc
 
 DAZEL_RC_FILE = ".dazelrc"
 DAZEL_RUN_FILE = ".dazel_run"
-BAZEL_WORKSPACE_FILE = "WORKSPACE"
+# see also https://github.com/bazelbuild/buildtools/blob/92a716d768c05fa90e241fd2c2b0411125a0ef89/wspace/workspace.go#L55-L62
+BAZEL_WORKSPACE_FILES = [
+    "WORKSPACE",
+    "WORKSPACE.bazel",
+    "MODULE.bazel",
+    "REPO.bazel",
+    ".buckconfig",
+    "pants",
+]
 
 DEFAULT_INSTANCE_NAME = "dazel"
 DEFAULT_IMAGE_NAME = "dazel"
@@ -546,14 +554,21 @@ class DockerInstance:
         """Find the workspace directory.
 
         This is done by traversing the directory structure from the given dazel
-        directory until we find the WORKSPACE file.
+        directory until we find one of the WORKSPACE files.
         """
         directory = os.path.realpath(os.environ.get(
                 "DAZEL_DIRECTORY", DEFAULT_DIRECTORY))
         while (directory and directory != "/" and
-               not os.path.exists(os.path.join(directory, BAZEL_WORKSPACE_FILE))):
+               not cls._has_workspace_directory(directory)):
             directory = os.path.dirname(directory)
         return directory
+
+    @classmethod
+    def _has_workspace_directory(cls, directory):
+        for filename in BAZEL_WORKSPACE_FILES:
+            if os.path.exists(os.path.join(directory, filename)):
+                return True
+        return False
 
 
 def main():
